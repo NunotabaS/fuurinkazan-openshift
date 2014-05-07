@@ -32,7 +32,7 @@ var FuurinKazanKaze = function() {
 			console.warn('[Deploy] No OPENSHIFT_MONGODB_DB_PASSWORD, using localhost');
 			self.connection_string = "127.0.0.1:27017/fuurinkazan";
 		}
-		self.status.machineName = process.env.MACHINE_NAME || (self.ipaddress + ":" + self.port);
+		self.status.machineName = process.env.MACHINE_NAME || process.env.OPENSHIFT_APP_DNS || (self.ipaddress + ":" + self.port);
 		self.outdir = process.env.OPENSHIFT_DATA_DIR || (__dirname + "/uploads");
 		process.env.TMPDIR = self.outdir;
 	};
