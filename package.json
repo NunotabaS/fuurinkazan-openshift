@@ -1,19 +1,21 @@
 {
-  "name": "OpenShift-Sample-App",
+  "name": "FuurinKazan-Kaze",
   "version": "1.0.0",
-  "description": "OpenShift Sample Application",
+  "description": "FuurinKazan Video Deployment Cloud",
   "keywords": [
-    "OpenShift",
+    "Fuurinkazan",
     "Node.js",
-    "application",
+    "cloud",
+    "video",
+    "danmaku",
     "openshift"
   ],
   "author": {
-    "name": "OpenShift",
-    "email": "ramr@example.org",
-    "url": "http://www.openshift.com/"
+    "name": "Jim Chen",
+    "email": "knh.jabbany@gmail.com",
+    "url": "http://kanoha.org/"
   },
-  "homepage": "http://www.openshift.com/",
+  "homepage": "http://kanoha.org/",
   "repository": {
     "type": "git",
     "url": "https://github.com/openshift/origin-server"
@@ -25,7 +27,9 @@
   },
 
   "dependencies": {
-    "express": "~3.4.4"
+    "express": "~3.4.4",
+    "mongodb": "*",
+    "connect-multiparty":"~1.0.3"
   },
   "devDependencies": {},
   "bundleDependencies": [],
