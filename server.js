@@ -33,6 +33,8 @@ var FuurinKazanKaze = function() {
 			self.connection_string = "127.0.0.1:27017/fuurinkazan";
 		}
 		self.status.machineName = process.env.MACHINE_NAME || (self.ipaddress + ":" + self.port);
+		self.outdir = process.env.OPENSHIFT_DATA_DIR || (__dirname + "/uploads");
+		self.TMPDIR = self.outdir;
 	};
 	self.loadDatabase = function(callback){
 		MongoClient.connect('mongodb://'+self.connection_string, function(err, db) {
@@ -107,7 +109,7 @@ var FuurinKazanKaze = function() {
 								return;
 							}else{
 								var file = data.localname;
-								var rs = fs.createReadStream("upload/" + file); 
+								var rs = fs.createReadStream(self.outdir + file); 
 								rs.on("open",function(){
 									res.writeHead(200, {"Content-Type":data.type});
 									rs.pipe(res);
@@ -138,7 +140,7 @@ var FuurinKazanKaze = function() {
 				var shasum = crypto.createHash("sha1");
 				shasum.update(req.files.upload.name + "_" + (new Date()).getTime());
 				var localname = shasum.digest('hex') + "_" + (new Date()).getTime();
-				fs.rename(req.files.upload.path, "upload/" + localname, function(err){
+				fs.rename(req.files.upload.path, self.outdir + localname, function(err){
 					if(err) {
 						console.warn(err);
 						res.end(JSON.stringify({
