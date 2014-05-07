@@ -29,7 +29,8 @@
   "dependencies": {
     "express": "~3.4.4",
     "mongodb": "*",
-    "connect-multiparty":"~1.0.3"
+    "connect-multiparty":"~1.0.3",
+    "range-parser":"*"
   },
   "devDependencies": {},
   "bundleDependencies": [],

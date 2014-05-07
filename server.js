@@ -5,6 +5,7 @@ var fs	  = require('fs');
 var MongoClient = require('mongodb').MongoClient;
 var ObjectID = require('mongodb').ObjectID;
 var crypto = require('crypto');
+var RangeParser = require("range-parser");
 
 var FuurinKazanKaze = function() {
 	var self = this;
@@ -33,7 +34,7 @@ var FuurinKazanKaze = function() {
 			self.connection_string = "127.0.0.1:27017/fuurinkazan";
 		}
 		self.status.machineName = process.env.MACHINE_NAME || process.env.OPENSHIFT_APP_DNS || (self.ipaddress + ":" + self.port);
-		self.outdir = process.env.OPENSHIFT_DATA_DIR || (__dirname + "/uploads");
+		self.outdir = process.env.OPENSHIFT_DATA_DIR || (__dirname + "/upload/");
 		process.env.TMPDIR = self.outdir;
 	};
 	self.loadDatabase = function(callback){
@@ -88,7 +89,7 @@ var FuurinKazanKaze = function() {
 		self.routes.get['/get/:tag'] = function(req, res) {
 			var tag = req.params.tag;
 			self.loadDatabase(function(db){
-				db.collection("files").findOne({_id:ObjectID(tag)}, function(err, data){
+				db.collection("files").findOne({localname: tag}, function(err, data){
 					if(err){
 						console.warn(err);
 						res.writeHead(404, {"Content-Type":"text/plain"});
@@ -109,9 +110,31 @@ var FuurinKazanKaze = function() {
 								return;
 							}else{
 								var file = data.localname;
-								var rs = fs.createReadStream(self.outdir + file); 
+								var r = null;
+								if(req.headers && req.headers.range){
+									r = RangeParser(data.size,req.headers.range);
+								}
+								if(!r || r.length < 1 || r.type !== 'bytes'){
+									var rs = fs.createReadStream(self.outdir + file);
+								}else{
+									var rs = fs.createReadStream(self.outdir + file, r[0]);
+								}
 								rs.on("open",function(){
-									res.writeHead(200, {"Content-Type":data.type});
+									if(!r || r.length < 1){
+										res.writeHead(200, {
+											"Content-Type":data.type,
+											"Content-Length": data.size
+										});
+									}else{
+										var q = r[0];
+										res.writeHead(206, {
+											"Content-Type":data.type, 
+											"Accept-Ranges": "bytes",
+											"Content-Range": "bytes " + (q.start ? q.start : "0") 
+															+ "-" + (q.end ? q.end : "") + "/" + data.size,
+											"Content-Length":(q.end ? q.end : data.size) - (q.start ? q.start: 0)
+										});
+									}
 									rs.pipe(res);
 								});
 								rs.on('error', function(err) {
