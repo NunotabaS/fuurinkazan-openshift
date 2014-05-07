@@ -34,7 +34,7 @@ var FuurinKazanKaze = function() {
 		}
 		self.status.machineName = process.env.MACHINE_NAME || (self.ipaddress + ":" + self.port);
 		self.outdir = process.env.OPENSHIFT_DATA_DIR || (__dirname + "/uploads");
-		self.TMPDIR = self.outdir;
+		process.env.TMPDIR = self.outdir;
 	};
 	self.loadDatabase = function(callback){
 		MongoClient.connect('mongodb://'+self.connection_string, function(err, db) {
