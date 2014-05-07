@@ -33,7 +33,6 @@ var FuurinKazanKaze = function() {
 			self.connection_string = "127.0.0.1:27017/fuurinkazan";
 		}
 		self.status.machineName = process.env.MACHINE_NAME || (self.ipaddress + ":" + self.port);
-		process.env.TMPDIR = __dirname + "/upload"
 	};
 	self.loadDatabase = function(callback){
 		MongoClient.connect('mongodb://'+self.connection_string, function(err, db) {
