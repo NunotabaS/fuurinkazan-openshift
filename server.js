@@ -171,6 +171,7 @@ var FuurinKazanKaze = function() {
 							}else{
 								var file = data.localname;
 								var r = null;
+								console.warn(req.headers);
 								if(req.headers && req.headers.range){
 									r = RangeParser(data.size,req.headers.range);
 								}
