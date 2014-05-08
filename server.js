@@ -9,6 +9,30 @@ var RangeParser = require("range-parser");
 
 var FuurinKazanKaze = function() {
 	var self = this;
+	function encrypt(key, str) {
+		var s = [], j = 0, x, res = '';
+		for (var i = 0; i < 256; i++) {
+			s[i] = i;
+		}
+		for (i = 0; i < 256; i++) {
+			j = (j + s[i] + key.charCodeAt(i % key.length)) % 256;
+			x = s[i];
+			s[i] = s[j];
+			s[j] = x;
+		}
+		i = 0;
+		j = 0;
+		for (var y = 0; y < str.length; y++) {
+			i = (i + 1) % 256;
+			j = (j + s[i]) % 256;
+			x = s[i];
+			s[i] = s[j];
+			s[j] = x;
+			res += String.fromCharCode(str.charCodeAt(y) ^ s[(s[i] + s[j]) % 256]);
+		}
+		return res;
+	}
+	
 	self.status = {
 		files: 0,
 		size: 0,
@@ -37,15 +61,21 @@ var FuurinKazanKaze = function() {
 		self.status.machineName = process.env.MACHINE_NAME || process.env.OPENSHIFT_APP_DNS || (self.ipaddress + ":" + self.port);
 		self.outdir = process.env.OPENSHIFT_DATA_DIR || (__dirname + "/upload/");
 		process.env.TMPDIR = self.outdir;
+		if(fs.existsSync(self.outdir + "keyfile")){
+			try{
+				self.key = JSON.parse(fs.readFileSync(self.outdir + "keyfile"));
+			}catch(e){
+				console.warn(e);
+			}
+		}
 	};
 	self.loadDatabase = function(callback){
 		MongoClient.connect('mongodb://'+self.connection_string, function(err, db) {
 			if(err) {
 				self.status.isUp = false;
 				self.status.lastErr = err.toString();
-				return;
 			}
-			callback(db);
+			callback(db, err);
 		});
 	};
 
@@ -72,6 +102,11 @@ var FuurinKazanKaze = function() {
 		self.routes = { post: {}, get: {}};
 		
 		self.routes.get['/html/upload'] = function(req, res) {
+			if(self.key && self.key.disable_html){
+				res.writeHead(404, {"Content-Type":"text/plain"});
+				res.end("404 Not Found");
+				return;
+			}
 			res.writeHead(200, {"Content-Type":"text/html"});
 			res.end('<html>'+
 				'<form action="/upload" method="POST" enctype="multipart/form-data">' +
@@ -80,15 +115,39 @@ var FuurinKazanKaze = function() {
 				'</form></html>');
 		};
 		
+		self.routes.get['/html/key'] = function(req, res) {
+			if(self.key && self.key.disable_html){
+				res.writeHead(404, {"Content-Type":"text/plain"});
+				res.end("404 Not Found");
+				return;
+			}
+			res.writeHead(200, {"Content-Type":"text/html"});
+			res.end('<html><h1>Update Keyfile</h1>'+
+				'<form action="/key" method="POST" enctype="multipart/form-data">' +
+				'Keyfile: <input type="file" name="keyfile"/><br>' +
+				'Oldkey: <input type="file" name="oldkeyfile"/><br>' +
+				'<input type="submit" value="submit"/>' +
+				'</form></html>');
+		};
+		
 		self.routes.get['/status'] = function(req, res) {
+			if(self.key && self.key.output_key){
+				res.writeHead(200, {"Content-Type":"text/html"});
+				self.setupFileCache(function(err){
+					var string = encrypt(self.key.output_key, JSON.stringify(self.status));
+					res.end((new Buffer(string)).toString("base64"));
+				});
+				return;
+			}
 			res.writeHead(200, {"Content-Type":"application/json"});
-			self.setupFileCache(function(){
+			self.setupFileCache(function(err){
 				res.end(JSON.stringify(self.status));
 			});
 		};
 		
 		self.routes.get['/get/:tag'] = function(req, res) {
 			var tag = req.params.tag;
+			var isForce = req.query ? (req.query.s === "1" ? true : false) : false;
 			self.loadDatabase(function(db){
 				db.collection("files").findOne({localname: tag}, function(err, data){
 					if(err){
@@ -115,6 +174,10 @@ var FuurinKazanKaze = function() {
 								if(req.headers && req.headers.range){
 									r = RangeParser(data.size,req.headers.range);
 								}
+								if(isForce){
+									r = [{start:0, end: data.size}];
+									r.type = "bytes";
+								}
 								if(!r || r.length < 1 || r.type !== 'bytes'){
 									var rs = fs.createReadStream(self.outdir + file);
 								}else{
@@ -124,6 +187,7 @@ var FuurinKazanKaze = function() {
 									if(!r || r.length < 1){
 										res.writeHead(200, {
 											"Content-Type":data.type,
+											"Accept-Ranges": "bytes",
 											"Content-Length": data.size
 										});
 									}else{
@@ -147,6 +211,27 @@ var FuurinKazanKaze = function() {
 						}
 					}
 				});
+			});
+		};
+		
+		self.routes.get['/list'] = function(req, res) {
+			res.writeHead(200, {"Content-Type":"application/json"});
+			var limit = req.query.limit && req.query.limit < 200 ? req.query.limit : 200;
+			var skip = req.query.skip ? req.query.skip : 0;
+			self.loadDatabase(function(db){
+				if(!db){
+					res.end(JSON.stringify({
+						"error":4,
+						"desc":"Database not connected"
+					}));
+				}
+				db.collection("files").find({},{skip:skip, limit:limit}).toArray(function(err, docs){
+					res.end(JSON.stringify({
+						"length":docs.length,
+						"records":docs
+					}));
+				});
+				return;
 			});
 		};
 		
@@ -174,6 +259,14 @@ var FuurinKazanKaze = function() {
 						return;
 					}
 					self.loadDatabase(function(db){
+						if(!db){
+							res.end(JSON.stringify({
+								"error":4,
+								"desc":"Database not connected"
+							}));
+							fs.unlink(self.outdir + localname);
+							return;
+						}
 						var fileref = {
 							"name":req.files.upload.name,
 							"size":req.files.upload.size,
@@ -194,6 +287,73 @@ var FuurinKazanKaze = function() {
 					"desc":"No file uploaded"
 				}));
 			}
+		};
+		
+		self.routes.post['/key'] = function(req, res){
+			res.writeHead(200, {"Content-Type":"application/json"});
+			if(req.files && req.files.keyfile && req.files.oldkeyfile){
+				var newkey = fs.readFileSync(req.files.keyfile.path);
+				try{
+					var nkobj = JSON.parse(newkey);
+				}catch(e){
+					res.end(JSON.stringify({
+						"error":5,
+						"desc":"Keyfile Corrupt!"
+					}));
+					fs.unlink(req.files.keyfile.path, function(){});
+					fs.unlink(req.files.oldkeyfile.path, function(){});
+					return;
+				}
+				
+				if(fs.existsSync(self.outdir + "keyfile")){
+					var oldkey = fs.readFileSync(self.outdir + "keyfile");
+					var shasum = crypto.createHash("sha1");
+					shasum.update(oldkey);
+					if(shasum.digest("hex") !== nkobj.oldkey_checksum){
+						res.end(JSON.stringify({
+							"error":6,
+							"desc":"Illegal Key"
+						}));
+						fs.unlink(req.files.keyfile.path, function(){});
+						fs.unlink(req.files.oldkeyfile.path, function(){});
+						return;
+					}else{
+						fs.rename(req.files.keyfile.path, self.outdir + "keyfile", function(err){
+							var shasum = crypto.createHash("sha1");
+							shasum.update(newkey);
+							res.end(JSON.stringify({
+								"updated":1,
+								"checksum":shasum.digest("hex")
+							}));
+							fs.unlink(req.files.keyfile.path, function(){});
+						});
+						fs.unlink(req.files.oldkeyfile.path, function(){});
+					}
+				}else{
+					fs.rename(req.files.keyfile.path, self.outdir + "keyfile", function(err){
+						var shasum = crypto.createHash("sha1");
+						shasum.update(newkey);
+						res.end(JSON.stringify({
+							"updated":1,
+							"checksum":shasum.digest("hex")
+						}));
+						fs.unlink(req.files.keyfile.path, function(){});
+					});
+					fs.unlink(req.files.oldkeyfile.path, function(){});
+				}
+			}else{
+				res.end(JSON.stringify({
+					"error":2,
+					"desc":"No file uploaded"
+				}));
+			}
+		};
+		
+		self.routes.post['/download'] = function(req, res) {
+			res.writeHead(200, {"Content-Type":"application/json"});
+			res.end(JSON.stringify({
+				"scheduled-id":0
+			}));
 		};
 	};
 
@@ -221,7 +381,14 @@ var FuurinKazanKaze = function() {
 	};
 
 	self.setupFileCache = function(callback){
-		self.loadDatabase(function(db){
+		self.loadDatabase(function(db, err){
+			if(err){
+				self.status.isUp = false;
+				self.status.files = 0;
+				if(callback)
+					callback(err);
+				return;
+			}
 			db.collection('files').aggregate([{
 				$group:{
 					_id:null,
