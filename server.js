@@ -183,7 +183,7 @@ var FuurinKazanKaze = function() {
 								}else{
 									var rs = fs.createReadStream(self.outdir + file, r[0]);
 								}
-								rs.on("open",function(){
+								rs.once("open",function(){
 									if(!r || r.length < 1){
 										res.writeHead(200, {
 											"Content-Type":data.type,
@@ -202,7 +202,7 @@ var FuurinKazanKaze = function() {
 									}
 									rs.pipe(res);
 								});
-								rs.on('error', function(err) {
+								rs.once('error', function(err) {
 									res.writeHead(500, {"Content-Type":"text/plain"});
 									res.end("File Error");
 									return;

@@ -45,6 +45,9 @@ Fuurinkazan-Openshift
 - `GET /html/upload`
 	上传文件UI界面，用于调试
 
+- `GET /html/key`
+	上传新的keyfile
+
 - `POST /key`
 	上传一个钥匙文件于 keyfile ，上传旧的钥匙文件于 oldkeyfile。如果 keyfile 非空，则会要求
 	加密所有非 `/get/:id` 通讯。同时 `/get/:id` 需要 keyfile 的信息。第一次部署请上传同样的
