@@ -171,7 +171,6 @@ var FuurinKazanKaze = function() {
 							}else{
 								var file = data.localname;
 								var r = null;
-								console.warn(req.headers);
 								if(req.headers && req.headers.range){
 									r = RangeParser(data.size,req.headers.range);
 								}
@@ -185,10 +184,9 @@ var FuurinKazanKaze = function() {
 									var rs = fs.createReadStream(self.outdir + file, r[0]);
 								}
 								rs.once("open",function(){
-									if(!r || r.length < 1){
+									if(true || !r || r.length < 1){
 										res.writeHead(200, {
 											"Content-Type":data.type,
-											"Accept-Ranges": "bytes",
 											"Content-Length": data.size
 										});
 									}else{
