@@ -1,3 +1,26 @@
-The OpenShift `nodejs` cartridge documentation can be found at:
+Fuurinkazan-Openshift
+=================================
 
-https://github.com/openshift/origin-server/tree/master/cartridges/openshift-origin-cartridge-nodejs/README.md
+这是一个动态文件上传服务的实现。Openshift服务器支持免费高达 1GB 的存储空间，如果进行多服务器联动的话，就可以实现相当程度的视频挂载服务。
+
+
+接口
+--------------
+接口如下：
+
+- `GET /`
+	告诉你这里什么也没有
+
+- `GET /status`
+	返回服务器信息，比如有多少文件，总硬盘空间占用等等等等。
+	
+- `GET /get/:id`
+	通过文件ID获取一个文件，支持Range头可动态。
+
+- `POST /upload`
+	上传文件，区域 upload。上传后会返回文件的访问信息
+	
+- `GET /html/upload`
+	上传文件UI界面，用于调试
+
+
